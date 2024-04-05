@@ -1,0 +1,53 @@
+blueprint:
+  name: Climate - Turn off thermostat when the window opens
+  description: Turn off the thermostat when the window opens, then turn it on again when the window is closed.
+  domain: automation
+  input: 
+    window_sensor:
+      name: Window sensor
+      description: The sensor that tells us when the window is opened or closed.
+      selector:
+        entity:
+          filter:
+            - domain: binary_sensor
+              device_class: window
+    thermostat:
+      name: Thermostat
+      description: The thermostat we want to turn off or on.
+      selector:
+        entity:
+          filter:
+            - domain: climate
+
+trigger:
+  - platform: state
+    entity_id: !input window_sensor
+    to: "on"
+  - platform: state
+    entity_id: !input thermostat
+    from: "off"
+condition:
+  - condition: state
+    entity_id: !input window_sensor
+    state: "on"
+  - condition: not
+    conditions:
+      - condition: state
+        entity_id: !input thermostat
+        state: "off"
+action:
+  - service: climate.turn_off
+    metadata: {}
+    data: {}
+    target:
+      entity_id: !input thermostat
+  - wait_for_trigger:
+      - platform: state
+        entity_id: !input window_sensor
+        to: "off"
+    continue_on_timeout: false
+  - service: climate.turn_on
+    metadata: {}
+    data: {}
+    target:
+      entity_id: !input thermostat

@@ -1,0 +1,135 @@
+blueprint:
+  name: Lights - Control with light sensor
+  description: Turn a light on or off based on the light level in the room
+  domain: automation
+  input:
+    light_sensor:
+      name: Light sensor
+      description: This sensor will control the light.
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: illuminance
+    light:
+      name: Light
+      description: This light will be turned on and off by the light sensor.
+      selector:
+        entity:
+          filter:
+            - domain: light
+    presence:
+      name: Presence Sensor
+      description: The light will only turn on or off when presence is detected.
+      selector:
+        entity:
+          filter:
+            - domain: binary_sensor
+              device_class: occupancy
+    lux_off:
+      name: Light Minimum
+      description: The lux value at which the light will be turned off.
+      default: 50
+      selector:
+        number:
+          min: 0
+          mode: box
+          unit_of_measurement: lx
+    lux_on:
+      name: Light Threshold
+      description: The lux value at which the light will be turned on.
+      default: 20
+      selector:
+        number:
+          min: 0
+          mode: box
+          unit_of_measurement: lx
+    color_temperature:
+      name: Color Temperature
+      description: The color temperature the light will be set to.
+      default: 250
+      selector:
+        color_temp:
+    brightness:
+      name: Brightness
+      description: The brightness the light will be set to.
+      default: 70
+      selector:
+        number:
+          min: 1
+          max: 100
+          unit_of_measurement: "%"
+    transition:
+      name: Transition time
+      description: The time it will take the light to reach it's new state.
+      default: 60
+      selector:
+        number:
+          min: 0
+          max: 300
+          unit_of_measurement: seconds
+    additional_conditions:
+      name: Additional conditions
+      description: Additional conditions you want to check for.
+      selector:
+        condition:
+
+trigger:
+  - platform: state
+    entity_id: !input presence
+    to: "on"
+    id: "0"
+  - platform: numeric_state
+    entity_id: !input light_sensor
+    below: !input lux_on
+  - platform: numeric_state
+    entity_id: !input light_sensor
+    above: !input lux_off
+
+condition:
+  - condition: state
+    entity_id: !input presence
+    state: "on"
+
+action:
+  - choose:
+      - conditions: !input additional_conditions
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: numeric_state
+                    entity_id: !input light_sensor
+                    above: !input lux_off
+                sequence:
+                  - service: light.turn_off
+                    target:
+                      entity_id: !input light
+                    data:
+                      transition: !input transition
+              - conditions:
+                  - condition: numeric_state
+                    entity_id: !input light_sensor
+                    below: !input lux_on
+                sequence:
+                  - choose:
+                    - conditions:
+                      - condition: trigger
+                        id:
+                          - "0"
+                      sequence:
+                        - service: light.turn_on
+                          target:
+                            entity_id: !input light
+                          data:
+                            brightness_pct: !input brightness
+                            color_temp: !input color_temperature
+                            transition: 1
+                    default:
+                      - service: light.turn_on
+                        target:
+                          entity_id: !input light
+                        data:
+                          brightness_pct: !input brightness
+                          color_temp: !input color_temperature
+                          transition: !input transition
+mode: single
